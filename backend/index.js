@@ -21,18 +21,36 @@ const { initializeFirebaseAdmin } = require('./config/firebase-admin');
 initializeFirebaseAdmin();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = [
+  'https://unifriend.in',
+  'https://www.unifriend.in',
+  'http://localhost:3000'
+];
+
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:9002',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., mobile apps, curl)
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
 };
+
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -84,13 +102,6 @@ app.use((err, req, res, next) => {
     error: err.message || 'Internal Server Error',
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
   });
-});
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 UniFriend Backend API running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
 });
 
 module.exports = app;
