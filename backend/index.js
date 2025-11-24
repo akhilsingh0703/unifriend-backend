@@ -28,29 +28,18 @@ app.use(helmet());
 // CORS configuration
 const allowedOrigins = [
   'https://unifriend.in',
-  'https://www.unifriend.in',
-  'http://localhost:3000'
+  'https://www.unifriend.in'
 ];
 
 const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g., mobile apps, curl)
-    if (!origin) {
-      return callback(null, true);
-    }
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'), false);
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
+  credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options('*', cors());
 
 // Rate limiting
 const limiter = rateLimit({
