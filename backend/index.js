@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
@@ -26,28 +25,37 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+const ALLOWED_ORIGIN = 'https://unifriend.in';
+const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
+const ALLOWED_HEADERS = [
+  'Origin',
+  'X-Requested-With',
+  'Content-Type',
+  'Accept',
+  'Authorization'
+];
 
-    const allowedOrigins = [
-      'https://unifriend.in',
-      'https://www.unifriend.in'
-    ];
+const corsMiddleware = (req, res, next) => {
+  const requestOrigin = req.headers.origin;
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  if (requestOrigin && requestOrigin !== ALLOWED_ORIGIN) {
+    return res.status(403).json({ error: 'Not allowed by CORS' });
+  }
+
+  res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  res.header('Vary', 'Origin');
+  res.header('Access-Control-Allow-Methods', ALLOWED_METHODS.join(','));
+  res.header('Access-Control-Allow-Headers', ALLOWED_HEADERS.join(','));
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send();
+  }
+
+  next();
 };
 
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.use(corsMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({
