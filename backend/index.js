@@ -25,7 +25,25 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
-const ALLOWED_ORIGIN = 'https://unifriend.in';
+const baseAllowedOrigins = [
+  'https://unifriend.in',
+  'https://www.unifriend.in'
+];
+
+if (process.env.NODE_ENV !== 'production') {
+  baseAllowedOrigins.push(
+    'http://localhost:3000',
+    'http://localhost:9002',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:9002'
+  );
+}
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true; // allow server-to-server or curl requests
+  return baseAllowedOrigins.includes(origin);
+};
+
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
 const ALLOWED_HEADERS = [
   'Origin',
@@ -38,11 +56,15 @@ const ALLOWED_HEADERS = [
 const corsMiddleware = (req, res, next) => {
   const requestOrigin = req.headers.origin;
 
-  if (requestOrigin && requestOrigin !== ALLOWED_ORIGIN) {
+  if (!isOriginAllowed(requestOrigin)) {
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
 
-  res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+  if (requestOrigin) {
+    res.header('Access-Control-Allow-Origin', requestOrigin);
+  } else {
+    res.header('Access-Control-Allow-Origin', baseAllowedOrigins[0]);
+  }
   res.header('Vary', 'Origin');
   res.header('Access-Control-Allow-Methods', ALLOWED_METHODS.join(','));
   res.header('Access-Control-Allow-Headers', ALLOWED_HEADERS.join(','));
