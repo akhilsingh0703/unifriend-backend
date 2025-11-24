@@ -31,3 +31,5 @@ google-credentials.json
 dist/
 build/
 
+.vercel
+.vercel
