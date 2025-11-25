@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
@@ -53,31 +54,20 @@ const ALLOWED_HEADERS = [
   'Authorization'
 ];
 
-const corsMiddleware = (req, res, next) => {
-  const requestOrigin = req.headers.origin;
-
-  if (!isOriginAllowed(requestOrigin)) {
-    return res.status(403).json({ error: 'Not allowed by CORS' });
-  }
-
-  if (requestOrigin) {
-    res.header('Access-Control-Allow-Origin', requestOrigin);
-  } else {
-    res.header('Access-Control-Allow-Origin', baseAllowedOrigins[0]);
-  }
-  res.header('Vary', 'Origin');
-  res.header('Access-Control-Allow-Methods', ALLOWED_METHODS.join(','));
-  res.header('Access-Control-Allow-Headers', ALLOWED_HEADERS.join(','));
-  res.header('Access-Control-Allow-Credentials', 'true');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).send();
-  }
-
-  next();
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ALLOWED_METHODS,
+  allowedHeaders: ALLOWED_HEADERS,
+  credentials: true,
+  optionsSuccessStatus: 204
 };
 
-app.use(corsMiddleware);
+app.use(cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -125,6 +115,9 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+  if (err && err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: err.message });
+  }
   res.status(err.status || 500).json({
     error: err.message || 'Internal Server Error',
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
