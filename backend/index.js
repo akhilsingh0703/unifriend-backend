@@ -14,25 +14,23 @@ const registrationRoutes = require('./routes/registration.routes');
 const newsletterRoutes = require('./routes/newsletter.routes');
 const adminRoutes = require('./routes/admin.routes');
 
-// Import Firebase Admin initialization
+// Firebase Admin initialization
 const { initializeFirebaseAdmin } = require('./config/firebase-admin');
-
-// Initialize Firebase Admin
 initializeFirebaseAdmin();
 
 const app = express();
 
-// Security middleware
+// ---------------- Security Middleware ----------------
 app.use(helmet());
 
-// CORS configuration
-const baseAllowedOrigins = [
+// ---------------- CORS Configuration ----------------
+const allowedOrigins = [
   'https://unifriend.in',
   'https://www.unifriend.in'
 ];
 
 if (process.env.NODE_ENV !== 'production') {
-  baseAllowedOrigins.push(
+  allowedOrigins.push(
     'http://localhost:3000',
     'http://localhost:9002',
     'http://127.0.0.1:3000',
@@ -40,62 +38,57 @@ if (process.env.NODE_ENV !== 'production') {
   );
 }
 
-const isOriginAllowed = (origin) => {
-  if (!origin) return true; // allow server-to-server or curl requests
-  return baseAllowedOrigins.includes(origin);
-};
-
-const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'];
-const ALLOWED_HEADERS = [
-  'Origin',
-  'X-Requested-With',
-  'Content-Type',
-  'Accept',
-  'Authorization'
-];
-
 const corsOptions = {
   origin: (origin, callback) => {
-    if (isOriginAllowed(origin)) {
-      return callback(null, true);
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true); // allow request
     }
+    console.warn('CORS blocked:', origin);
     return callback(new Error('Not allowed by CORS'));
   },
-  methods: ALLOWED_METHODS,
-  allowedHeaders: ALLOWED_HEADERS,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization'
+  ],
   credentials: true,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
+  maxAge: 600
 };
 
+// Apply CORS
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // handle preflight requests
 
-// Rate limiting
-const limiter = rateLimit({
+// ---------------- Rate Limiting ----------------
+app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 100,                 // limit each IP
   message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+}));
 
-// Body parsing middleware
+// ---------------- Body Parsing ----------------
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging
+// ---------------- Logging (Dev Only) ----------------
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// Health check endpoint
+// ---------------- Health Check ----------------
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+  res.status(200).json({
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
   });
 });
 
-// API routes
+// ---------------- API Routes ----------------
 app.use('/api/auth', authRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/applications', applicationRoutes);
@@ -104,18 +97,18 @@ app.use('/api/registrations', registrationRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/admin', adminRoutes);
 
-// 404 handler
+// ---------------- 404 Handler ----------------
 app.use((req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     error: 'Not Found',
-    message: `Cannot ${req.method} ${req.path}`
+    message: `Cannot ${req.method} ${req.originalUrl}`
   });
 });
 
-// Error handler
+// ---------------- Error Handler ----------------
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  if (err && err.message === 'Not allowed by CORS') {
+  if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ error: err.message });
   }
   res.status(err.status || 500).json({
@@ -124,5 +117,5 @@ app.use((err, req, res, next) => {
   });
 });
 
-module.exports = app;
-
+// ---------------- Export for Vercel ----------------
+module.exports = (req, res) => app(req, res);
